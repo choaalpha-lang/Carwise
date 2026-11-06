@@ -1,0 +1,5 @@
+# One row per car with a KNOWN price. Lines starting with # are ignored. Do not include plates, VINs, owner names or phone numbers.
+# reference_type: transaction (actual sale/auction price, best) | appraisal (licensed appraiser) | listing (asking price, weakest)
+# condition: excellent | good | fair | repair · as_of_date: YYYY-MM-DD (date of the price)
+id,brand,model,year,mileage_km,condition,reference_price_thb,reference_type,reference_source,as_of_date
+EX-001,Honda,City,2022,80000,good,385000,transaction,Auction house A lot #123 (example row - delete),2026-10-15

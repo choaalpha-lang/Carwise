@@ -22,3 +22,7 @@ node_modules/
 android/app/build/
 ios/App/Pods/
 *.aab
+
+# E03 run outputs (may contain licensed reference data)
+eval/runs/
+eval/reference.csv

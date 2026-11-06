@@ -41,6 +41,23 @@ sources, divergence > 25% vs. the synthetic model is flagged) before showing it.
 - Not production-ready: a browser-held key is acceptable only for a moderated PoC; production
   needs a backend proxy, rate limiting and an accuracy evaluation (E03).
 
+## E03 accuracy evaluation (`eval/`)
+
+Measures the AI price check — and the synthetic model as a baseline — against cars with known prices.
+
+1. Copy `eval/reference-template.csv` → `eval/reference.csv` (git-ignored) and fill ≥ 30 cars.
+   Prefer `transaction` prices; `listing` (asking price) is weaker evidence. No plates / VINs / owner data.
+2. Agree the thresholds in `eval/e03-protocol.json` and fill `approval` **before** the first live run
+   (pre-registration). Put the sites your reference prices came from in `blocked_domains` (leakage control).
+3. `npm run e03 -- --ref eval/reference.csv` → dry run (validates inputs, no cost).
+4. `ANTHROPIC_API_KEY=… npm run e03 -- --ref eval/reference.csv --live --confirm` → runs, resumable
+   (`eval/runs/<protocol-id>/results.jsonl`), then writes `report.md` + `summary.json`.
+
+Metrics: MAPE, median / P90 absolute % error, bias, range coverage, range width, invalid-output rate,
+split by reference type, vehicle age and stated confidence (calibration); token / web-search usage and
+cost. The report records SHA-256 of the protocol and the reference file. `--draft` allows a trial
+run on an unapproved protocol, but the report is marked DRAFT and is not valid evidence.
+
 ## Run
 
 | Target | How |
