@@ -1,0 +1,8 @@
+{
+  "appId": "com.carwise.validation",
+  "appName": "CarWise",
+  "webDir": "www",
+  "backgroundColor": "#123532",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}

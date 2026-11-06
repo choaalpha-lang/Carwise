@@ -1,0 +1,21 @@
+{
+  "name": "carwise-validation-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CarWise Venture Validation — mobile app (PWA + Capacitor shell). Local-only, no backend.",
+  "scripts": {
+    "serve": "python3 -m http.server 8080 --directory www",
+    "test": "node tests/smoke.test.js",
+    "cap:add:android": "cap add android",
+    "cap:add:ios": "cap add ios",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  }
+}
