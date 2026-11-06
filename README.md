@@ -17,6 +17,17 @@ independent review and Go / Pivot / Stop).
 | iOS (native) | `npm install` → `npm run cap:add:ios` → `npm run cap:sync` → `npm run cap:open:ios` (Xcode, macOS only) |
 | Smoke test | `npm test` (Playwright + Chromium, iPhone 13 viewport) |
 
+## GitHub Pages
+
+`.github/workflows/pages.yml` runs the smoke test on every PR and push, then deploys `www/` to
+GitHub Pages on push to `main` (test must pass first).
+
+One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Live URL after the first deploy: `https://choaalpha-lang.github.io/Carwise/` (HTTPS, so
+“Add to Home Screen” installs it as an app). Note: GitHub Pages sites are public — the app
+contains no data, but users must not treat it as a place to store confidential evidence;
+entries stay in each device's local storage only.
+
 ## Structure
 
 ```
