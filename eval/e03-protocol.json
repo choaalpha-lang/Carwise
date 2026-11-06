@@ -1,0 +1,23 @@
+{
+  "id": "e03-ai-price-v1",
+  "_notes": [
+    "Pre-registration: agree and sign the thresholds BEFORE the first live run. Any change after results are seen = new protocol id.",
+    "Thresholds below are PROPOSED defaults for discussion, not approved criteria.",
+    "Ratios: 0.12 = 12%. APE is measured on the range midpoint against reference_price_thb.",
+    "blocked_domains: list the sites your reference prices came from, so the AI cannot read the answer (leakage control).",
+    "pricing.web_search_per_1k is left null (UNKNOWN) until confirmed from the current Anthropic pricing page."
+  ],
+  "model": "claude-opus-5-5",
+  "thresholds": {
+    "min_cars": 30,
+    "max_invalid_rate": 0.05,
+    "max_mape": 0.12,
+    "max_p90_ape": 0.25,
+    "max_abs_bias": 0.05,
+    "min_coverage": 0.6,
+    "max_mean_width": 0.25
+  },
+  "blocked_domains": [],
+  "pricing": { "input_per_mtok": 4, "output_per_mtok": 20, "web_search_per_1k": null },
+  "approval": { "approved_by": "", "approved_on": "", "role": "" }
+}
