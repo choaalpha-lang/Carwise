@@ -62,6 +62,64 @@ const baht = n => (n < 0 ? '−' : '') + '฿' + Math.abs(Math.round(n)).toLocal
 const bahtRange = (a, b) => `${baht(a)} – ${baht(b)}`;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function toast(s) { const t = el('toast'); t.textContent = s; t.classList.add('show'); clearTimeout(window._tt); window._tt = setTimeout(() => t.classList.remove('show'), 2800); }
+// ---------- AI price check (PoC, Claude API + web search) ----------
+// The API key lives only in this device's localStorage under its own key: never in db, never exported.
+const AI_KEY = 'carwise_ai_key';
+const aiKey = () => { try { return localStorage.getItem(AI_KEY) || ''; } catch (e) { return ''; } };
+let aiBusy = false, aiController = null;
+function loadAI() {
+  if (window.CarWiseAI) return Promise.resolve(window.CarWiseAI);
+  return new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'ai.js'; sc.onload = () => ok(window.CarWiseAI); sc.onerror = () => bad(new Error('โหลดโมดูล AI ไม่ได้ (ต้องต่ออินเทอร์เน็ต)')); document.head.appendChild(sc); });
+}
+// Sanity checks before anything from the model is shown as a number.
+function checkAI(a, model) {
+  const issues = [];
+  const okNum = n => Number.isInteger(n) && n > 10000 && n < 50000000;
+  if (!okNum(a.low_thb) || !okNum(a.high_thb) || a.low_thb > a.high_thb) issues.push('ช่วงราคาที่ได้ไม่สมเหตุสมผล');
+  const sources = (Array.isArray(a.sources) ? a.sources : []).filter(x => /^https?:\/\//i.test(String(x.url || ''))).slice(0, 8);
+  if (!sources.length) issues.push('ไม่มีแหล่งอ้างอิงที่ตรวจสอบได้');
+  const mid = (a.low_thb + a.high_thb) / 2;
+  const divergence = model.mid ? (mid - model.mid) / model.mid : 0;
+  if (Math.abs(divergence) > 0.25) issues.push(`ต่างจากแบบจำลองเดิม ${divergence > 0 ? '+' : ''}${Math.round(divergence * 100)}%`);
+  const valid = okNum(a.low_thb) && okNum(a.high_thb) && a.low_thb <= a.high_thb && sources.length > 0;
+  return { low: r1k(a.low_thb), high: r1k(a.high_thb), confidence: a.confidence, comparables: a.comparable_count, summary: String(a.summary_th || '').slice(0, 600), sources, divergence, issues, valid, model: a.model, at: new Date().toISOString() };
+}
+async function runAI(target) {
+  if (aiBusy) return;
+  const key = aiKey(); if (!key) { toast('ยังไม่ได้ตั้งค่า API key ในหน้า “ตั้งค่า”'); return; }
+  aiBusy = true; aiController = new AbortController(); render();
+  const t0 = Date.now();
+  try {
+    const mod = await loadAI();
+    const raw = await mod.estimate(target.car, key, { signal: aiController.signal });
+    target.ai = checkAI(raw, target.result);
+    track('ai_estimate', { ok: true, ms: Date.now() - t0, valid: target.ai.valid, confidence: target.ai.confidence, comparables: target.ai.comparables, divergence: Math.round(target.ai.divergence * 100) });
+  } catch (err) {
+    const E = window.CarWiseAI && window.CarWiseAI.errors;
+    const msg = aiController && aiController.signal.aborted ? 'ยกเลิกแล้ว'
+      : E && err instanceof E.AuthenticationError ? 'API key ไม่ถูกต้อง' : E && err instanceof E.RateLimitError ? 'เรียกใช้ถี่เกินไป ลองใหม่ภายหลัง'
+      : E && err instanceof E.APIConnectionError ? 'เชื่อมต่อ AI ไม่ได้' : (err.message || 'เกิดข้อผิดพลาด');
+    target.ai = { error: msg, at: new Date().toISOString() };
+    track('ai_estimate', { ok: false, ms: Date.now() - t0, error: msg });
+  } finally { aiBusy = false; aiController = null; save(); render(); }
+}
+function aiCard(d, canRun) {
+  const a = d.ai;
+  if (!aiKey() && !a) return '';
+  if (aiBusy) return `<div class="card aicard"><div class="row"><b>🤖 AI กำลังค้นราคาตลาด…</b><button class="btn ghost" style="width:auto" data-action="ai-cancel">ยกเลิก</button></div><div class="aiprogress"><span></span></div><p class="tiny">ค้นจากประกาศขายและแหล่งราคาในไทย อาจใช้เวลา 20–60 วินาที</p></div>`;
+  if (!a) return canRun ? `<div class="card aicard"><b>🤖 เช็กราคาตลาดด้วย AI (ทดลอง)</b><p class="small" style="margin:4px 0 10px">AI จะค้นประกาศขายรถรุ่นนี้ในไทยแล้วสรุปช่วงราคา พร้อมแหล่งอ้างอิง — ส่งเฉพาะ ยี่ห้อ/รุ่น/ปี/ไมล์/สภาพ</p><button class="btn secondary" data-action="ai-run">ค้นราคาด้วย AI</button></div>` : '';
+  if (a.error) return `<div class="card aicard"><b>🤖 AI ประเมินไม่สำเร็จ</b><p class="small" style="margin:4px 0 10px">${esc(a.error)}</p>${canRun ? '<button class="btn secondary" data-action="ai-run">ลองอีกครั้ง</button>' : ''}</div>`;
+  const conf = { high: ['good', 'สูง'], medium: ['mid', 'ปานกลาง'], low: ['low', 'ต่ำ'] }[a.confidence] || ['low', '—'];
+  return `<div class="card aicard">
+    <div class="row"><b>🤖 ราคาตลาดจาก AI</b><span class="chip ${conf[0]}">ความมั่นใจ ${conf[1]}</span></div>
+    ${a.valid ? `<div class="num" style="font-size:24px;margin:6px 0 2px">${bahtRange(a.low, a.high)}</div><div class="tiny">อ้างอิง ${Number(a.comparables) || 0} รายการ · ส่วนต่างหลังหักหนี้ ${bahtRange(a.low - d.result.payoff, a.high - d.result.payoff)}</div>` : '<p class="small" style="margin:6px 0">ผลจาก AI ไม่ผ่านการตรวจสอบ จึงไม่แสดงเป็นตัวเลข</p>'}
+    ${a.issues.length ? `<div class="notice warn" style="margin:10px 0 0">${a.issues.map(esc).join(' · ')} — ควรตรวจราคาจริงก่อนตัดสินใจ</div>` : ''}
+    ${a.summary ? `<p class="small" style="margin-top:10px">${esc(a.summary)}</p>` : ''}
+    ${a.sources.length ? `<details style="margin-top:8px"><summary class="small"><b>แหล่งอ้างอิง (${a.sources.length})</b></summary><ul class="srclist">${a.sources.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(x.title || x.url)}</a>${Number.isInteger(x.price_thb) ? ` · ${baht(x.price_thb)}` : ''}${x.note ? `<div class="tiny">${esc(x.note)}</div>` : ''}</li>`).join('')}</ul></details>` : ''}
+    <p class="tiny" style="margin-top:8px">สรุปโดย AI จากข้อมูลบนเว็บ อาจคลาดเคลื่อน ไม่ใช่ราคาประเมินอย่างเป็นทางการ</p>
+  </div>`;
+}
+
 const icon = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>',
   garage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 16h14l-1.5-5.5A2 2 0 0 0 15.6 9H8.4a2 2 0 0 0-1.9 1.5Z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/><path d="M4 16v3M20 16v3"/></svg>',
@@ -219,7 +277,7 @@ function equityBox(r) {
   return `<div class="equity ${cls}"><div class="label">${r.payoff ? 'ส่วนต่าง (มูลค่ารถ − หนี้ที่เหลือ)' : 'รถของคุณปลอดหนี้'}</div><div class="num">${bahtRange(r.eqLow, r.eqHigh)}</div><p>${r.payoff ? msg : 'มูลค่าทั้งหมดเป็นของคุณ'}</p></div>`;
 }
 
-function resultBody(d, withCta) {
+function resultBody(d, withCta, aiRun = withCta) {
   const r = d.result;
   const max = Math.max(r.high, r.payoff, 1);
   const conf = { good: ['good', 'ค่อนข้างดี'], mid: ['mid', 'ปานกลาง'], low: ['low', 'ต่ำ — ควรเช็กราคาจริง'] }[r.confidence];
@@ -230,6 +288,7 @@ function resultBody(d, withCta) {
       <span class="chip ${conf[0]}">ความมั่นใจ: ${conf[1]}</span>
     </div>
     ${equityBox(r)}
+    ${aiCard(d, aiRun)}
     <div class="card">
       <b>เทียบมูลค่ารถกับหนี้</b>
       <div class="compare">
@@ -309,7 +368,7 @@ let viewing = null;
 function vSaved() {
   const c = db.cars.find(x => x.id === viewing);
   if (!c) { route = 'garage'; return vGarage(); }
-  el('view').innerHTML = resultBody(c, false) + `<p class="tiny" style="margin:4px 0 12px">ประเมินเมื่อ ${new Date(c.at).toLocaleString('th-TH')}</p>
+  el('view').innerHTML = resultBody(c, false, true) + `<p class="tiny" style="margin:4px 0 12px">ประเมินเมื่อ ${new Date(c.at).toLocaleString('th-TH')}</p>
     <div class="btnstack"><button class="btn secondary" data-action="reassess" data-id="${esc(c.id)}">ประเมินใหม่ด้วยข้อมูลเดิม</button><button class="btn danger" data-action="delcar" data-id="${esc(c.id)}">ลบรายการนี้</button></div>`;
 }
 
@@ -329,6 +388,12 @@ function vSettings() {
       <button class="listbtn" data-action="toggle-research"><span>บันทึกการใช้งานเพื่อการวิจัย<small>ไม่ระบุตัวตน เก็บในเครื่องนี้เท่านั้น</small></span><span class="switch ${db.research ? 'on' : ''}" role="switch" aria-checked="${db.research}"></span></button>
       <button class="listbtn" data-action="about">เกี่ยวกับการทดลอง & ความเป็นส่วนตัว<small>เราเก็บอะไร และไม่เก็บอะไร</small></button>
       <button class="listbtn" data-action="install">ติดตั้งเป็นแอปบนหน้าจอ<small>ใช้งานได้แม้ไม่มีอินเทอร์เน็ต</small></button>
+    </div>
+    <div class="section">AI ประเมินราคา (ทดลอง · สำหรับเครื่องของทีม)</div>
+    <div class="card">
+      ${aiKey() ? `<div class="row"><span><b>เปิดใช้งานแล้ว</b><div class="tiny">key ลงท้าย …${esc(aiKey().slice(-4))} · เก็บในเครื่องนี้เท่านั้น</div></span><button class="btn danger" style="width:auto;min-height:40px" data-action="ai-forget">ลบ key</button></div>`
+      : `<label class="field" style="margin-bottom:8px">Claude API key<input id="aiKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-..."></label><button class="btn secondary" data-action="ai-save">บันทึก key</button>`}
+      <p class="tiny" style="margin-top:10px">ใส่เฉพาะบนเครื่องที่ทีมใช้ทดสอบกับผู้ใช้ (moderated) ห้ามใส่บนเครื่องของผู้ใช้ทั่วไป · key ไม่ถูกส่งออกในไฟล์ JSON · ข้อมูลที่ส่งไป Anthropic: ยี่ห้อ รุ่น ปี ไมล์ สภาพรถ เท่านั้น · ควรตั้ง spend limit ของ key ให้ต่ำ</p>
     </div>
     <div class="section">สำหรับผู้ดำเนินการทดลอง</div>
     <div class="card">
@@ -356,6 +421,7 @@ const aboutHtml = `
     <li><b>ไม่ใช่คำแนะนำทางการเงิน</b> และไม่มีการทำธุรกรรมใด ๆ</li>
     <li><b>ไม่เก็บข้อมูลส่วนบุคคล:</b> ไม่ถามชื่อ เบอร์โทร เลขบัตร หรือทะเบียนรถ</li>
     <li><b>ไม่ส่งข้อมูลออกจากเครื่อง:</b> ไม่มีการส่งให้ไฟแนนซ์ เต็นท์รถ หรือพาร์ทเนอร์</li>
+    <li>ถ้ากด “ค้นราคาด้วย AI” ข้อมูลรถ (ยี่ห้อ รุ่น ปี ไมล์ สภาพ) จะถูกส่งไปยังบริการ AI ของ Anthropic เพื่อค้นราคา — ไม่มีข้อมูลระบุตัวตน</li>
     <li>ลบข้อมูลทั้งหมดได้ทุกเมื่อที่หน้า “ตั้งค่า”</li>
   </ul>`;
 function sheetConsent() {
@@ -377,7 +443,7 @@ function computeResult() {
 }
 function finish() {
   const d = db.draft;
-  const entry = { id: d.sid, at: new Date().toISOString(), car: { ...d.car }, loan: { ...d.loan }, result: d.result };
+  const entry = { id: d.sid, at: new Date().toISOString(), car: { ...d.car }, loan: { ...d.loan }, result: d.result, ai: d.ai || null };
   if (d.nextStep !== 'none') { db.cars = db.cars.filter(c => c.id !== entry.id); db.cars.unshift(entry); }
   db.feedback.push({ sid: d.sid, at: entry.at, nextStep: d.nextStep, useful: d.fb.useful, clear: d.fb.clear, again: d.fb.again, comment: (d.fb.comment || '').slice(0, 500) });
   track('journey_complete', { nextStep: d.nextStep, useful: d.fb.useful, clear: d.fb.clear, again: d.fb.again });
@@ -425,7 +491,11 @@ document.addEventListener('click', e => {
       else openSheet(`<h3 id="sheetTitle">ติดตั้ง CarWise</h3><ul><li><b>Android:</b> เมนู ⋮ ของเบราว์เซอร์ → “เพิ่มลงในหน้าจอหลัก” / “ติดตั้งแอป”</li><li><b>iPhone:</b> ปุ่มแชร์ ⬆️ ใน Safari → “เพิ่มไปยังหน้าจอโฮม”</li></ul><div class="btnstack"><button class="btn secondary" data-action="close">ปิด</button></div>`);
       break;
     case 'export': exportData(); toast('ส่งออกข้อมูลแล้ว (ไม่มีข้อมูลส่วนบุคคล)'); break;
-    case 'reset': if (confirm('ลบข้อมูลทั้งหมดในเครื่องนี้?')) { db = blank(); save(); go('home'); toast('ลบข้อมูลแล้ว'); } break;
+    case 'ai-run': { const target = route === 'view' ? db.cars.find(x => x.id === viewing) : db.draft; if (target) runAI(target); break; }
+    case 'ai-cancel': if (aiController) aiController.abort(); break;
+    case 'ai-save': { const v = (el('aiKeyInput').value || '').trim(); if (!/^sk-ant-[\w-]{20,}$/.test(v)) { toast('รูปแบบ key ไม่ถูกต้อง'); return; } try { localStorage.setItem(AI_KEY, v); } catch (e) { toast('บันทึก key ไม่ได้'); return; } vSettings(); toast('บันทึก key แล้ว (เฉพาะเครื่องนี้)'); break; }
+    case 'ai-forget': if (confirm('ลบ API key ออกจากเครื่องนี้?')) { try { localStorage.removeItem(AI_KEY); } catch (e) { /* noop */ } vSettings(); toast('ลบ key แล้ว'); } break;
+    case 'reset': if (confirm('ลบข้อมูลทั้งหมดในเครื่องนี้?')) { db = blank(); try { localStorage.removeItem(AI_KEY); } catch (e) { /* noop */ } save(); go('home'); toast('ลบข้อมูลแล้ว'); } break;
   }
 });
 

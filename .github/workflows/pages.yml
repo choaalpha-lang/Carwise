@@ -21,10 +21,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install Playwright (Chromium only)
+      - name: Install dependencies + Playwright (Chromium only)
         run: |
-          npm install --no-save --no-package-lock playwright@1.48.2
+          npm ci
+          npm install --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
+      - name: AI bundle matches source
+        run: |
+          npm run -s build:ai
+          git diff --exit-code www/ai.js
       - name: Smoke test (iPhone 13 viewport)
         run: npm test
 

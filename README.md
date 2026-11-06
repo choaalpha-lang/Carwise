@@ -26,6 +26,21 @@ Settings → *สำหรับผู้ดำเนินการทดลอ
 Internal menus (Funding, Review, Evidence) were removed from the customer app and live only in
 `/team/`.
 
+## AI price check (PoC · Claude API + web search)
+
+On the result screen, a facilitator device with an API key can run **“ค้นราคาด้วย AI”**:
+`claude-opus-5-5` searches Thai listings (`web_search`) and returns a range + sources through a
+strict tool (`report_price_estimate`). The app sanity-checks the answer (numeric range, http(s)
+sources, divergence > 25% vs. the synthetic model is flagged) before showing it.
+
+- Source `src/ai.mjs` → bundle `www/ai.js` via `npm run build:ai` (CI fails if they drift).
+- Key: Settings → *AI ประเมินราคา* — stored only in that device's `localStorage`, never exported.
+  Use a dedicated key with a low spend limit, on team devices only (moderated sessions).
+- Sent to Anthropic: brand, model, year, mileage, condition — no personal data.
+- Refusal fallback enabled (`fallbacks: "default"`); `pause_turn` resumed up to 3 times.
+- Not production-ready: a browser-held key is acceptable only for a moderated PoC; production
+  needs a backend proxy, rate limiting and an accuracy evaluation (E03).
+
 ## Run
 
 | Target | How |

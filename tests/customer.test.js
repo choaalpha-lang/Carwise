@@ -104,10 +104,44 @@ const server = http.createServer((req, res) => {
   assert.match(st, /100% · เป้า ≥30%/);
   await shot('c09-settings');
 
+  // AI price check (Claude API mocked — no network): key stays on device, request carries only car data
+  let apiReq = null;
+  await page.route('https://api.anthropic.com/**', async route => {
+    apiReq = { body: JSON.parse(route.request().postData()), headers: await route.request().allHeaders() };
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({
+      id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'tool_use', stop_sequence: null,
+      usage: { input_tokens: 10, output_tokens: 10 },
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'report_price_estimate', input: {
+        low_thb: 370000, high_thb: 420000, confidence: 'medium', comparable_count: 6, summary_th: 'อ้างอิงประกาศขาย <b>6</b> รายการ',
+        sources: [{ title: 'Listing A', url: 'https://example.com/a', price_thb: 389000, note: '' }, { title: 'bad', url: 'javascript:alert(1)', price_thb: null, note: '' }] } }]
+    }) });
+  });
+  await page.fill('#aiKeyInput', 'sk-ant-test-0000000000000000000000');
+  await page.click('[data-action="ai-save"]');
+  assert.match(await page.textContent('#view'), /เปิดใช้งานแล้ว/);
+  await page.click('.tab[data-go="garage"]');
+  await page.click('[data-open]');
+  await page.click('[data-action="ai-run"]');
+  await page.waitForSelector('.aicard .num', { timeout: 15000 });
+  const aiText = await page.textContent('.aicard');
+  assert.match(aiText, /฿370,000 – ฿420,000/);
+  assert.ok(aiText.includes('<b>6</b>'), 'model text rendered escaped');
+  assert.equal(await page.$$eval('.srclist a', a => a.length), 1, 'non-http source dropped');
+  assert.equal(apiReq.body.model, 'claude-opus-5-5');
+  assert.ok(apiReq.body.tools.some(t => t.type === 'web_search_20260209'));
+  assert.equal(apiReq.body.fallbacks, 'default');
+  assert.equal(apiReq.headers['authorization'], 'Bearer sk-ant-test-0000000000000000000000');
+  assert.equal(apiReq.headers['anthropic-dangerous-direct-browser-access'], 'true');
+  assert.equal(apiReq.body.messages[0].content.includes('Honda City'), true);
+  await shot('c11-ai');
+  await page.click('.tab[data-go="settings"]');
+
   // Export contains no free-form PII fields beyond the optional comment, and has events
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="export"]')]);
   const data = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
   assert.equal(data.synthetic_valuation, true);
+  assert.ok(!JSON.stringify(data).includes('sk-ant-'), 'API key never exported');
+  assert.ok(data.events.some(e => e.ev === 'ai_estimate' && e.p.ok && e.p.valid));
   assert.ok(data.events.some(e => e.ev === 'journey_complete' && e.p.nextStep === 'refinance'));
   assert.ok(data.events.some(e => e.ev === 'option_view' && e.p.option === 'refinance'));
 
