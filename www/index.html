@@ -9,52 +9,28 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CarWise">
-<meta name="description" content="CarWise Venture Validation — 90-day stage-gated validation tracker (local-only demo)">
-<title>CarWise Validation</title>
+<meta name="description" content="CarWise — รู้มูลค่ารถเทียบกับหนี้ที่เหลือ ก่อนตัดสินใจขาย เทิร์น หรือรีไฟแนนซ์ (เวอร์ชันทดลอง)">
+<title>CarWise</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=DM+Sans:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=DM+Sans:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="shell">
-  <header class="appbar">
-    <div class="appbar-brand">
-      <div class="brandmark" aria-hidden="true">C</div>
-      <div>
-        <div class="eyebrow" id="pageEyebrow">CARWISE · VALIDATION</div>
-        <h1 class="pagetitle" id="pageTitle">Overview</h1>
-      </div>
-    </div>
-    <div class="appbar-actions">
-      <span class="pill" id="decisionPill">PENDING</span>
-      <button class="iconbtn" data-action="more" aria-label="More actions">
-        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-      </button>
-    </div>
-  </header>
-
-  <main class="content" id="content">
-    <section class="screen active" id="screen-overview"></section>
-    <section class="screen" id="screen-experiments"></section>
-    <section class="screen" id="screen-funding"></section>
-    <section class="screen" id="screen-evidence"></section>
-    <section class="screen" id="screen-review"></section>
-    <p class="footnote">CarWise Venture Studio · Synthetic/local prototype · No APIs, no real customer data, no transactions. ข้อมูลเก็บเฉพาะในเครื่องนี้ (local storage) ไม่ส่งไป Server หรือ Partner — ใช้ “Reset demo data” เพื่อลบ</p>
-  </main>
-
-  <nav class="tabbar" id="tabbar" aria-label="Main"></nav>
+  <header class="appbar" id="appbar"></header>
+  <div class="trialbar" role="note">เวอร์ชันทดลอง · ตัวเลขเป็นค่าประมาณจำลอง ไม่ใช่ราคาประเมินจริง</div>
+  <main class="content" id="view" tabindex="-1"></main>
+  <nav class="tabbar" id="tabbar" aria-label="เมนูหลัก"></nav>
 </div>
-
-<div class="sheet-backdrop" id="sheetBackdrop" data-action="close-sheet" hidden></div>
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <div class="sheet-grip" aria-hidden="true"></div>
   <div id="sheetBody"></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
 <script src="app.js"></script>
 </body>
 </html>

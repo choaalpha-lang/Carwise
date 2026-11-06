@@ -18,7 +18,7 @@ const server = http.createServer((req, res) => {
 
 (async () => {
   await new Promise(r => server.listen(0, r));
-  const base = `http://127.0.0.1:${server.address().port}/`;
+  const base = `http://127.0.0.1:${server.address().port}/team/`;
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ ...devices['iPhone 13'] });
   const page = await ctx.newPage();
@@ -112,5 +112,5 @@ const server = http.createServer((req, res) => {
 
   assert.deepEqual(errors, [], 'no console/page errors');
   await browser.close(); server.close();
-  console.log('✓ smoke test passed');
+  console.log('✓ team tracker test passed');
 })().catch(async e => { console.error('✗', e); server.close(); process.exit(1); });

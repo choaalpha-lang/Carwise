@@ -5,7 +5,7 @@
   "description": "CarWise Venture Validation — mobile app (PWA + Capacitor shell). Local-only, no backend.",
   "scripts": {
     "serve": "python3 -m http.server 8080 --directory www",
-    "test": "node tests/smoke.test.js",
+    "test": "node tests/customer.test.js && node tests/team.test.js",
     "cap:add:android": "cap add android",
     "cap:add:ios": "cap add ios",
     "cap:sync": "cap sync",
