@@ -2,20 +2,23 @@
   "name": "carwise-validation-app",
   "version": "1.0.0",
   "private": true,
-  "description": "CarWise Venture Validation — mobile app (PWA + Capacitor shell). Local-only, no backend.",
+  "description": "CarWise Venture Validation \u2014 mobile app (PWA + Capacitor shell). Local-only, no backend.",
   "scripts": {
     "serve": "python3 -m http.server 8080 --directory www",
-    "test": "node tests/smoke.test.js",
+    "test": "node tests/customer.test.js && node tests/team.test.js",
     "cap:add:android": "cap add android",
     "cap:add:ios": "cap add ios",
     "cap:sync": "cap sync",
     "cap:open:android": "cap open android",
-    "cap:open:ios": "cap open ios"
+    "cap:open:ios": "cap open ios",
+    "build:ai": "esbuild src/ai.mjs --bundle --format=iife --global-name=CarWiseAI --minify --target=es2020 --legal-comments=eof --outfile=www/ai.js"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
-    "@capacitor/ios": "^6.2.0"
+    "@capacitor/ios": "^6.2.0",
+    "esbuild": "^0.28.2"
   }
 }

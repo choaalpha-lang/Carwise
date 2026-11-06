@@ -1,12 +1,45 @@
-# CarWise — Venture Validation Mobile App
+# CarWise — Customer Trial App
 
-Mobile app version of the CarWise *Venture Validation Command Center*: a 90-day, stage-gated
-validation tracker (experiments E01–E05, funding gates G0/G1/G2/Reserve, evidence register,
-independent review and Go / Pivot / Stop).
+Mobile app for **car owners** to test hypothesis **E01 – Customer Problem & Decision Utility**:
+*does seeing “car value vs. remaining loan” help people decide (sell / trade-in / refinance / keep)?*
 
-**Local-only prototype.** No backend, no partner API, no real transactions. All data stays in
-`localStorage` on the device. The app migrates existing data from the web dashboard
-(same `carwise_validation_v1` key) on first launch.
+Live: https://choaalpha-lang.github.io/Carwise/ · Team tracker: https://choaalpha-lang.github.io/Carwise/team/
+
+**Trial safeguards** — no backend, no partner API, no transactions; no name / phone / ID / plate
+collected; valuations come from a **synthetic illustrative model** (not market data — data rights
+are E03); partner-interest choices are a disclosed “fake door” (nothing is sent). Research logging
+is opt-in, anonymous and stays on the device until the facilitator exports it.
+
+## Customer journey (5 steps)
+
+| Step | Screen | Logged event (opt-in) |
+|---|---|---|
+| 0 | Consent sheet (first launch) | — |
+| 1 | Car: brand, model, year, mileage, condition | `journey_start`, `step_complete:car` |
+| 2 | Loan: payoff amount, or installment × months remaining | `step_complete:loan` |
+| 3 | Result: value range, equity (value − payoff), confidence, “why this number” | `result_view` |
+| 4 | Options: sell / trade-in / refinance / keep — neutral, with risks | `option_view` |
+| 5 | Next step + 3-question feedback | `next_step_select`, `journey_complete` |
+
+Settings → *สำหรับผู้ดำเนินการทดลอง* shows the on-device funnel against E01 targets
+(≥60% complete journey, ≥30% meaningful next step) and exports JSON for the evidence register.
+Internal menus (Funding, Review, Evidence) were removed from the customer app and live only in
+`/team/`.
+
+## AI price check (PoC · Claude API + web search)
+
+On the result screen, a facilitator device with an API key can run **“ค้นราคาด้วย AI”**:
+`claude-opus-5-5` searches Thai listings (`web_search`) and returns a range + sources through a
+strict tool (`report_price_estimate`). The app sanity-checks the answer (numeric range, http(s)
+sources, divergence > 25% vs. the synthetic model is flagged) before showing it.
+
+- Source `src/ai.mjs` → bundle `www/ai.js` via `npm run build:ai` (CI fails if they drift).
+- Key: Settings → *AI ประเมินราคา* — stored only in that device's `localStorage`, never exported.
+  Use a dedicated key with a low spend limit, on team devices only (moderated sessions).
+- Sent to Anthropic: brand, model, year, mileage, condition — no personal data.
+- Refusal fallback enabled (`fallbacks: "default"`); `pause_turn` resumed up to 3 times.
+- Not production-ready: a browser-held key is acceptable only for a moderated PoC; production
+  needs a backend proxy, rate limiting and an accuracy evaluation (E03).
 
 ## Run
 
@@ -15,7 +48,7 @@ independent review and Go / Pivot / Stop).
 | Browser / PWA | `npm run serve` → open `http://localhost:8080` on the phone (same Wi-Fi) → **Add to Home Screen**. Works offline after the first load (service worker). PWA install needs HTTPS or localhost. |
 | Android (native) | `npm install` → `npm run cap:add:android` → `npm run cap:sync` → `npm run cap:open:android` (Android Studio) → Build APK/AAB |
 | iOS (native) | `npm install` → `npm run cap:add:ios` → `npm run cap:sync` → `npm run cap:open:ios` (Xcode, macOS only) |
-| Smoke test | `npm test` (Playwright + Chromium, iPhone 13 viewport) |
+| Tests | `npm test` — customer journey (Pixel 7) + team tracker (iPhone 13), Playwright |
 
 ## GitHub Pages
 
@@ -31,17 +64,16 @@ entries stay in each device's local storage only.
 ## Structure
 
 ```
-www/                 web app (no build step, no runtime dependencies)
-  index.html         shell, CSP, PWA meta
-  styles.css         mobile-first UI (bottom tab bar, bottom sheets, safe-area insets)
-  app.js             state, rendering, control checks, export
-  sw.js              offline app-shell cache (bump VERSION per release)
-  manifest.webmanifest, icons/
+www/                 customer app (no build step, no runtime dependencies)
+  index.html, styles.css, app.js   wizard, synthetic valuation, research log
+  sw.js, manifest.webmanifest, icons/
+www/team/            internal validation tracker (experiments, funding gates, evidence, review)
 capacitor.config.json  native wrapper config (appId com.carwise.validation)
-tests/smoke.test.js    end-to-end test of the control rules below
+tests/customer.test.js customer journey, consent, funnel stats, export
+tests/team.test.js     team tracker control rules
 ```
 
-## Controls added vs. the web dashboard
+## Team tracker (`/team/`): controls added vs. the web dashboard
 
 | Area | Web dashboard | Mobile app |
 |---|---|---|
