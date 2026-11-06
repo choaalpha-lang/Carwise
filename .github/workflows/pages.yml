@@ -33,7 +33,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: test
     runs-on: ubuntu-latest
+    # Job-level permissions replace the workflow-level block, so contents: read
+    # must be repeated here or checkout fails on a private repo.
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
